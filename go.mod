@@ -1,3 +1,3 @@
-module github.com/advent-of-code-2020
+module github.com/mbark/advent-of-code-2020
 
 go 1.15
