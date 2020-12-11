@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/mbark/advent-of-code-2020/util"
 )
@@ -117,13 +118,15 @@ L.LLLLL.LL
 
 func main() {
 	lines := util.ReadInput(input, "\n")
-	var seats [][]rune
+	var fSeats [][]rune
+	var sSeats [][]rune
 	for _, l := range lines {
-		seats = append(seats, []rune(l))
+		fSeats = append(fSeats, []rune(l))
+		sSeats = append(sSeats, []rune(l))
 	}
 
-	// fmt.Printf("first %d\n", first(seats))
-	fmt.Printf("second %d\n", second(seats))
+	fmt.Printf("first %d\n", first(fSeats))
+	fmt.Printf("second %d\n", second(sSeats))
 }
 
 type Update struct {
