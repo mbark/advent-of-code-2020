@@ -1849,14 +1849,29 @@ Tile 3079:
 ..#.###...
 `
 
-type Tile struct {
-	Name  int
-	Edges Edges
+const seaMonster = `
+                  #
+#    ##    ##    ###
+ #  #  #  #  #  #
+`
+
+type Edges struct {
+	Up    int
+	Down  int
+	Left  int
+	Right int
 	Tile  []string
 }
 
+type Tile struct {
+	Name         int
+	Edges        Edges
+	Permutations []Edges
+	Tile         []string
+}
+
 func main() {
-	ts := util.ReadInput(input, "\n\n")
+	ts := util.ReadInput(testInput, "\n\n")
 
 	var tiles []Tile
 	for _, t := range ts {
@@ -1866,7 +1881,8 @@ func main() {
 			Name: name,
 			Tile: strings.Split(l[1], "\n"),
 		}
-		tile.Edges = edgeIDs(tile.Tile)
+		tile.Edges = edges(tile.Tile)
+		tile.Permutations = permutations(tile.Tile)
 
 		tiles = append(tiles, tile)
 	}
@@ -1876,81 +1892,9 @@ func main() {
 	fmt.Printf("second %d\n", second(placement))
 }
 
-func borderless(placement [][]Tile) []string {
-	var m []string
-
-	var wb [][][]string
-	for _, row := range placement {
-		var wbr [][]string
-		for _, tile := range row {
-			wbr = append(wbr, stripBorder(tile))
-		}
-
-		wb = append(wb, wbr)
-	}
-
-	for _, row := range wb {
-		for k := 0; k < len(row[0][0]); k++ {
-			var r strings.Builder
-			for _, t := range row {
-				r.WriteString(t[k])
-			}
-			m = append(m, r.String())
-		}
-	}
-
-	return m
-}
-
-func stripBorder(t Tile) []string {
-	var w []string
-
-	for i, r := range t.Tile {
-		if i == 0 || i == len(t.Tile)-1 {
-			continue
-		}
-
-		var b strings.Builder
-		for j, c := range r {
-			if j == 0 || j == len(r)-1 {
-				continue
-			}
-
-			b.WriteRune(c)
-		}
-
-		w = append(w, b.String())
-	}
-
-	return w
-}
-
 func second(placement [][]Tile) int {
-	monsters := checkSeaMonsters(placement)
-
-	return monsters
-}
-
-const seaMonster = `
-                  #
-#    ##    ##    ###
- #  #  #  #  #  #
-`
-
-func checkSeaMonsters(tiles [][]Tile) int {
-	t := borderless(tiles)
-
-	var monsters int
-	for _, r := range [][]string{t, flip(t)} {
-		for i := 0; i < 4; i++ {
-			r = rotate(r)
-
-			m := checkSeaMonster(r)
-			if m > 0 {
-				monsters = m
-			}
-		}
-	}
+	t := borderless(placement)
+	monsters := checkSeaMonsters(t)
 
 	sea := 0
 	for _, row := range t {
@@ -1962,6 +1906,21 @@ func checkSeaMonsters(tiles [][]Tile) int {
 	}
 
 	return sea - (monsters * 15)
+}
+
+func checkSeaMonsters(t []string) int {
+	for _, r := range [][]string{t, flip(t)} {
+		for i := 0; i < 4; i++ {
+			r = rotate(r)
+
+			m := checkSeaMonster(r)
+			if m > 0 {
+				return m
+			}
+		}
+	}
+
+	return 0
 }
 
 func checkSeaMonster(t []string) int {
@@ -2012,39 +1971,6 @@ func checkSeaMonster(t []string) int {
 	return monsters
 }
 
-func rotate(l []string) []string {
-	newlr := make([][]rune, len(l))
-	size := len(l)
-	for i, row := range l {
-		coli := size - i - 1
-		for j, c := range row {
-			rowi := j
-			if newlr[rowi] == nil {
-				newlr[rowi] = make([]rune, len(l))
-			}
-
-			newlr[rowi][coli] = rune(c)
-		}
-	}
-
-	newl := make([]string, len(l))
-	for i, row := range newlr {
-		newl[i] = string(row)
-	}
-
-	return newl
-}
-
-func flip(l []string) []string {
-	newl := make([]string, len(l))
-
-	for i, row := range l {
-		newl[len(newl)-1-i] = row
-	}
-
-	return newl
-}
-
 func first(tiles []Tile) (int, [][]Tile) {
 	size := int(math.Sqrt(float64(len(tiles))))
 	placements := make([][]Tile, size)
@@ -2054,17 +1980,6 @@ func first(tiles []Tile) (int, [][]Tile) {
 
 	canPlace, p := placeNext(placements, 0, 0, size, make(map[int]bool), tiles, Tile{})
 	if canPlace {
-		fmt.Printf("%d * %d * %d * %d\n", p[0][0].Name, p[0][size-1].Name, p[size-1][0].Name, p[size-1][size-1].Name)
-		// for _, row := range p {
-		// 	for k := 0; k < len(row[0].Tile[0]); k++ {
-		// 		for _, t := range row {
-		// 			fmt.Printf("%s ", t.Tile[k])
-		// 		}
-		// 		fmt.Println()
-		// 	}
-		// 	fmt.Println()
-		// }
-
 		return p[0][0].Name * p[0][size-1].Name * p[size-1][0].Name * p[size-1][size-1].Name, p
 	}
 
@@ -2092,39 +2007,23 @@ func placeNext(placements [][]Tile, ri, ci, size int, used map[int]bool, tiles [
 			continue
 		}
 
-		for _, r := range []Tile{ot, ot.FlipH()} {
-			for i := 0; i < 4; i++ {
-				r = r.Rotate()
+		for _, edges := range ot.Permutations {
+			fits := true
+			if ri > 0 {
+				up := placements[ri-1][ci]
+				if up.Name > 0 {
+					fits = fits && edges.Up == up.Edges.Down
+				}
+			}
+			if ci > 0 {
+				left := placements[ri][ci-1]
+				if left.Name > 0 {
+					fits = fits && edges.Left == left.Edges.Right
+				}
+			}
 
-				fits := true
-				if ri > 0 {
-					up := placements[ri-1][ci]
-					if up.Name > 0 {
-						fits = fits && r.Edges.Up == up.Edges.Down
-					}
-				}
-				if ri < size-1 {
-					down := placements[ri+1][ci]
-					if down.Name > 0 {
-						fits = fits && r.Edges.Down == down.Edges.Up
-					}
-				}
-				if ci > 0 {
-					left := placements[ri][ci-1]
-					if left.Name > 0 {
-						fits = fits && r.Edges.Left == left.Edges.Right
-					}
-				}
-				if ci < size-1 {
-					right := placements[ri][ci+1]
-					if right.Name > 0 {
-						fits = fits && r.Edges.Right == right.Edges.Left
-					}
-				}
-
-				if fits {
-					next = append(next, r)
-				}
+			if fits {
+				next = append(next, Tile{Name: ot.Name, Edges: edges, Tile: edges.Tile})
 			}
 		}
 	}
@@ -2140,6 +2039,7 @@ func placeNext(placements [][]Tile, ri, ci, size int, used map[int]bool, tiles [
 			copy(rowp, placements[i])
 			nextp[i] = rowp
 		}
+
 		usedc := make(map[int]bool)
 		for k, v := range used {
 			usedc[k] = v
@@ -2154,64 +2054,53 @@ func placeNext(placements [][]Tile, ri, ci, size int, used map[int]bool, tiles [
 	return false, placements
 }
 
-func (t Tile) Print() {
-	for _, row := range t.Tile {
-		fmt.Printf("%s\n", row)
+func borderless(placement [][]Tile) []string {
+	var m []string
+
+	var wb [][][]string
+	for _, row := range placement {
+		var wbr [][]string
+		for _, tile := range row {
+			wbr = append(wbr, stripBorder(tile))
+		}
+
+		wb = append(wb, wbr)
 	}
-	fmt.Println()
-}
 
-func (t Tile) Rotate() Tile {
-	newTileR := make([][]rune, len(t.Tile))
-	size := len(t.Tile)
-	for i, row := range t.Tile {
-		coli := size - i - 1
-		for j, c := range row {
-			rowi := j
-			if newTileR[rowi] == nil {
-				newTileR[rowi] = make([]rune, len(t.Tile))
+	for _, row := range wb {
+		for k := 0; k < len(row[0][0]); k++ {
+			var r strings.Builder
+			for _, t := range row {
+				r.WriteString(t[k])
 			}
-
-			newTileR[rowi][coli] = rune(c)
+			m = append(m, r.String())
 		}
 	}
 
-	newTile := make([]string, len(t.Tile))
-	for i, row := range newTileR {
-		newTile[i] = string(row)
-	}
-
-	return Tile{
-		Name:  t.Name,
-		Tile:  newTile,
-		Edges: edgeIDs(newTile),
-	}
+	return m
 }
 
-// flip over the horizontal axis
-func (t Tile) FlipH() Tile {
-	newTile := make([]string, len(t.Tile))
+func permutations(tile []string) []Edges {
+	var perm []Edges
+	for _, doFlip := range []bool{false, true} {
+		t := tile
+		if doFlip {
+			t = flip(t)
+		}
 
-	for i, row := range t.Tile {
-		newTile[len(newTile)-1-i] = row
+		for j := 0; j < 4; j++ {
+			t = rotate(t)
+			e := edges(t)
+			e.Tile = t
+			perm = append(perm, e)
+		}
 	}
 
-	return Tile{
-		Name:  t.Name,
-		Tile:  newTile,
-		Edges: edgeIDs(newTile),
-	}
+	return perm
 }
 
-type Edges struct {
-	Up    int
-	Right int
-	Down  int
-	Left  int
-}
-
-func edgeIDs(tile []string) Edges {
-	strToNum := func(s string) int {
+func edges(tile []string) Edges {
+	edgeValue := func(s string) int {
 		s = strings.ReplaceAll(s, "#", "1")
 		s = strings.ReplaceAll(s, ".", "0")
 		n, _ := strconv.ParseInt(s, 2, 64)
@@ -2219,27 +2108,83 @@ func edgeIDs(tile []string) Edges {
 	}
 
 	var edges Edges
+	edges.Up = edgeValue(tile[0])
+	edges.Down = edgeValue(tile[len(tile)-1])
 
-	// up
-	edges.Up = strToNum(tile[0])
-
-	// bottom
-	edges.Down = strToNum(tile[len(tile)-1])
-
-	// left
 	var b strings.Builder
 	for _, s := range tile {
 		b.WriteByte(s[0])
 	}
 
-	edges.Left = strToNum(b.String())
+	edges.Left = edgeValue(b.String())
 
-	// right
 	b.Reset()
 	for _, s := range tile {
 		b.WriteByte(s[len(tile)-1])
 	}
 
-	edges.Right = strToNum(b.String())
+	edges.Right = edgeValue(b.String())
 	return edges
+}
+
+func rotate(l []string) []string {
+	newlr := make([][]rune, len(l))
+	size := len(l)
+	for i, row := range l {
+		coli := size - i - 1
+		for j, c := range row {
+			rowi := j
+			if newlr[rowi] == nil {
+				newlr[rowi] = make([]rune, len(l))
+			}
+
+			newlr[rowi][coli] = rune(c)
+		}
+	}
+
+	newl := make([]string, len(l))
+	for i, row := range newlr {
+		newl[i] = string(row)
+	}
+
+	return newl
+}
+
+func flip(l []string) []string {
+	newl := make([]string, len(l))
+	for i, row := range l {
+		newl[len(newl)-1-i] = row
+	}
+
+	return newl
+}
+
+func stripBorder(t Tile) []string {
+	var w []string
+
+	for i, r := range t.Tile {
+		if i == 0 || i == len(t.Tile)-1 {
+			continue
+		}
+
+		var b strings.Builder
+		for j, c := range r {
+			if j == 0 || j == len(r)-1 {
+				continue
+			}
+
+			b.WriteRune(c)
+		}
+
+		w = append(w, b.String())
+	}
+
+	return w
+}
+
+func (t Tile) Print() {
+	for _, row := range t.Tile {
+		fmt.Printf("%s\n", row)
+	}
+	fmt.Println()
 }
