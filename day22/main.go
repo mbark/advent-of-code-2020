@@ -128,7 +128,7 @@ func first(deck1, deck2 []int) int {
 }
 
 func second(deck1, deck2 []int) int {
-	result := playRecursive(deck1, deck2, make(map[string]bool), gameCount)
+	result := playRecursive(deck1, deck2, make(map[float64]bool))
 
 	return calculateScore(result.Deck1, result.Deck2)
 }
@@ -144,11 +144,9 @@ type State struct {
 	Deck2 []int
 }
 
-var gameCount int = 1
-
-func playRecursive(deck1, deck2 []int, prev map[string]bool, game int) Result {
+func playRecursive(deck1, deck2 []int, prev map[float64]bool) Result {
 	for len(deck1) > 0 && len(deck2) > 0 {
-		h := fmt.Sprintf("%v;%v", deck1, deck2)
+		h := hashDeck(deck1, deck2)
 		if _, ok := prev[h]; ok {
 			return Result{Player1Win: true, Deck1: deck1, Deck2: deck2}
 		} else {
@@ -167,8 +165,7 @@ func playRecursive(deck1, deck2 []int, prev map[string]bool, game int) Result {
 			d2 := make([]int, c2)
 			copy(d2, deck2)
 
-			gameCount += 1
-			result := playRecursive(d1, d2, make(map[string]bool), gameCount)
+			result := playRecursive(d1, d2, make(map[float64]bool))
 			winner1 = result.Player1Win
 		} else if c1 > c2 {
 			winner1 = true
@@ -184,6 +181,22 @@ func playRecursive(deck1, deck2 []int, prev map[string]bool, game int) Result {
 	}
 
 	return Result{Player1Win: len(deck1) > 0, Deck1: deck1, Deck2: deck2}
+}
+
+func hashDeck(deck1, deck2 []int) float64 {
+	var multiply float64 = 100
+	var hash float64 = 0
+
+	for i := range deck1 {
+		hash += multiply * float64(deck1[i])
+		multiply *= 100
+	}
+
+	for i := range deck2 {
+		hash += multiply * float64(deck2[i])
+	}
+
+	return hash
 }
 
 func calculateScore(deck1, deck2 []int) int {
