@@ -115,6 +115,12 @@ L.LLLLLL.L
 L.LLLLL.LL
 `
 
+// type Seats = map[int]*Seat
+type Seats struct {
+	Seats   []*Seat
+	Indexes []int
+}
+
 type Seat struct {
 	y     int
 	x     int
@@ -133,41 +139,41 @@ func main() {
 	defer stop()
 
 	lines := util.ReadInput(input, "\n")
-	fSeats := make(map[int]*Seat)
-	sSeats := make(map[int]*Seat)
+
+	maxhash := Seat{y: len(lines), x: len(lines[0])}.Hash()
+
+	var indexes []int
+	fSeats := make([]*Seat, maxhash+1)
+	sSeats := make([]*Seat, maxhash+1)
 	for y, row := range lines {
 		for x, l := range row {
 			if l == 'L' {
 				hash := Seat{y: y, x: x}.Hash()
+				indexes = append(indexes, hash)
 				fSeats[hash] = &Seat{y: y, x: x, state: Free}
 				sSeats[hash] = &Seat{y: y, x: x, state: Free}
 			}
 		}
 	}
 
-	fmt.Printf("first %d\n", first(fSeats))
-	fmt.Printf("second %d\n", second(sSeats))
+	fmt.Printf("first %d\n", first(Seats{Seats: fSeats, Indexes: indexes}))
+	fmt.Printf("second %d\n", second(Seats{Seats: sSeats, Indexes: indexes}))
 }
 
-type Update struct {
-	RowIdx int
-	ColIdx int
-	To     rune
-}
-
-func first(seats map[int]*Seat) int {
+func first(seats Seats) int {
 	return emptySeats(seats, 4, adjacentLocal(seats))
 }
 
-func second(seats map[int]*Seat) int {
+func second(seats Seats) int {
 	return emptySeats(seats, 5, adjacentView(seats))
 }
 
-func emptySeats(seats map[int]*Seat, leaveIf int, adjacent map[int][]*Seat) int {
+func emptySeats(seats Seats, leaveIf int, adjacent map[int][]*Seat) int {
 	for {
-		updates := make(map[int]State, len(seats))
+		updates := make(map[int]State, len(seats.Indexes))
 
-		for hash, s := range seats {
+		for _, hash := range seats.Indexes {
+			s := seats.Seats[hash]
 			adj := adjacent[hash]
 			switch s.state {
 			case Free:
@@ -200,14 +206,19 @@ func emptySeats(seats map[int]*Seat, leaveIf int, adjacent map[int][]*Seat) int 
 		}
 
 		for hash, to := range updates {
-			s := seats[hash]
+			s := seats.Seats[hash]
 			s.state = to
-			seats[hash] = s
+			seats.Seats[hash] = s
 		}
 	}
 
 	occupied := 0
-	for _, s := range seats {
+	for _, hash := range seats.Indexes {
+		s := seats.Seats[hash]
+		if s == nil {
+			continue
+		}
+
 		if s.state == Occupied {
 			occupied += 1
 		}
@@ -228,17 +239,25 @@ func printSeats(seats [][]rune) {
 	fmt.Println()
 }
 
-func adjacentLocal(seats map[int]*Seat) map[int][]*Seat {
+func adjacentLocal(seats Seats) map[int][]*Seat {
 	adj := func(ri, ci int) []*Seat {
 		var adjSeat []*Seat
 		for i := ri - 1; i <= ri+1; i++ {
+			if i < 0 {
+				continue
+			}
+
 			for j := ci - 1; j <= ci+1; j++ {
 				if i == ri && j == ci {
 					continue
 				}
 
-				seat, ok := seats[Seat{y: i, x: j}.Hash()]
-				if ok {
+				if j < 0 {
+					continue
+				}
+
+				seat := seats.Seats[Seat{y: i, x: j}.Hash()]
+				if seat != nil {
 					adjSeat = append(adjSeat, seat)
 				}
 			}
@@ -247,19 +266,25 @@ func adjacentLocal(seats map[int]*Seat) map[int][]*Seat {
 		return adjSeat
 	}
 
-	adjacent := make(map[int][]*Seat, len(seats))
-	for hash, seat := range seats {
+	adjacent := make(map[int][]*Seat, len(seats.Indexes))
+	for _, hash := range seats.Indexes {
+		seat := seats.Seats[hash]
 		adjacent[hash] = adj(seat.y, seat.x)
 	}
 
 	return adjacent
 }
 
-func adjacentView(seats map[int]*Seat) map[int][]*Seat {
-	max := 0
-	for _, s := range seats {
-		if s.y > max {
-			max = s.y
+func adjacentView(seats Seats) map[int][]*Seat {
+	maxx := 0
+	maxy := 0
+	for _, hash := range seats.Indexes {
+		s := seats.Seats[hash]
+		if s.y > maxy {
+			maxy = s.y
+		}
+		if s.x > maxx {
+			maxx = s.x
 		}
 	}
 
@@ -278,12 +303,12 @@ func adjacentView(seats map[int]*Seat) map[int][]*Seat {
 					y := ri - i*m
 					x := ci - j*m
 
-					if y < 0 || y > max || x < 0 || x > max {
+					if y < 0 || y > maxy || x < 0 || x > maxx {
 						break
 					}
 
-					seat, ok := seats[Seat{y: y, x: x}.Hash()]
-					if ok {
+					seat := seats.Seats[Seat{y: y, x: x}.Hash()]
+					if seat != nil {
 						adjSeats = append(adjSeats, seat)
 						break
 					}
@@ -294,8 +319,9 @@ func adjacentView(seats map[int]*Seat) map[int][]*Seat {
 		return adjSeats
 	}
 
-	adjacent := make(map[int][]*Seat, len(seats))
-	for hash, seat := range seats {
+	adjacent := make(map[int][]*Seat, len(seats.Indexes))
+	for _, hash := range seats.Indexes {
+		seat := seats.Seats[hash]
 		adjacent[hash] = adj(seat.y, seat.x)
 	}
 
