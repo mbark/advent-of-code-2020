@@ -123,15 +123,11 @@ func first(food []Food) int {
 
 func second(food []Food) string {
 	mapping := findAllergenMapping(food)
-	fmt.Printf("%+v\n", mapping)
-
 	changesMade := true
 	fm := make(map[string]string)
 	var toRemove []string
 
 	for changesMade {
-		fmt.Printf("%+v\n", mapping)
-
 		for a, f := range mapping {
 			if len(f) == 1 {
 				fm[f[0]] = a
