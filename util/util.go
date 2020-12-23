@@ -17,7 +17,7 @@ func ReadInput(in, splitBy string) []string {
 func WithProfiling() func() {
 	flag.Parse()
 	if *cpuprofile == "" {
-		*cpuprofile = "run.prof"
+		return func() {}
 	}
 
 	f, err := os.Create(*cpuprofile)
