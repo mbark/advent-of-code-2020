@@ -17,15 +17,10 @@ const testInput = `
 `
 
 type CircularList struct {
-	Start *Node
-	Nodes []*Node
+	Start int
+	Nodes []int
 	Max   int
 	Min   int
-}
-
-type Node struct {
-	Val  int
-	Next *Node
 }
 
 func main() {
@@ -33,21 +28,20 @@ func main() {
 	defer stop()
 
 	var ns []int
-	for _, i := range strings.TrimSpace(input) {
+	for _, i := range strings.TrimSpace(testInput) {
 		n, _ := strconv.Atoi(string(i))
 		ns = append(ns, n)
 	}
 
 	list := Build(ns)
-	fmt.Printf("first %s\n", first(list, 100))
+	fmt.Printf("first %s\n", first(list, 10))
 	fmt.Printf("second %d\n", second(ns))
-
 }
 
 func first(list CircularList, iterations int) string {
 	list = play(list, iterations)
 
-	values := list.Nodes[1].Next.Values()
+	values := list.Values(list.Next(1))
 	var result strings.Builder
 	for _, v := range values {
 		// ignore the 1
@@ -73,57 +67,56 @@ func second(ns []int) int {
 	list := Build(ns)
 
 	list = play(list, 10*onem)
-	fth := list.Nodes[1]
-	return fth.Next.Val * fth.Next.Next.Val
+	next1 := list.Next(1)
+	next2 := list.Next(next1)
+	return next1 * next2
 }
 
 func play(list CircularList, iterations int) CircularList {
 	curr := list.Start
 	for i := 0; i < iterations; i++ {
-		next1 := curr.Next
-		next2 := next1.Next
-		next3 := next2.Next
+		next1 := list.Next(curr)
+		next2 := list.Next(next1)
+		next3 := list.Next(next2)
 
-		curr.Next = next3.Next
+		list.Nodes[curr] = list.Next(next3)
 
-		dest := curr.Val
-		var destCup *Node
+		dest := curr
 		for {
 			dest -= 1
 			if dest < list.Min {
 				dest = list.Max
 			}
 
-			if dest != next1.Val && dest != next2.Val && dest != next3.Val {
+			if dest != next1 && dest != next2 && dest != next3 {
 				break
 			}
 		}
 
-		destCup = list.Nodes[dest]
-		destCup.Next, next3.Next = next1, destCup.Next
-		curr = curr.Next
+		d := list.Next(dest)
+		list.Nodes[dest] = next1
+		list.Nodes[next3] = d
+		curr = list.Next(curr)
 	}
 
 	return list
 }
 
 func Build(list []int) CircularList {
-	var start *Node
-	var current *Node
+	var start int
+	var current int
 	var max, min int
-	nodes := make([]*Node, len(list)+1)
+	nodes := make([]int, len(list)+1)
 
 	for _, n := range list {
-		node := &Node{Val: n}
-		nodes[node.Val] = node
-		if current != nil {
-			current.Next = node
-		}
-		if start == nil {
-			start = node
+		if start == 0 {
+			start = n
+			current = start
+			continue
 		}
 
-		current = node
+		nodes[current] = n
+		current = n
 		if min == 0 || n < min {
 			min = n
 		}
@@ -132,23 +125,26 @@ func Build(list []int) CircularList {
 		}
 	}
 
-	current.Next = start
+	nodes[current] = start
 	return CircularList{Start: start, Nodes: nodes, Max: max, Min: min}
 }
 
-func (n *Node) Values() []int {
-	start := n.Val
-	curr := n
+func (c CircularList) Values(val int) []int {
+	start := val
+	curr := start
 
 	var values []int
-
 	for {
-		values = append(values, curr.Val)
-		curr = curr.Next
-		if curr.Val == start {
+		values = append(values, curr)
+		curr = c.Next(curr)
+		if curr == start {
 			break
 		}
 	}
 
 	return values
+}
+
+func (c CircularList) Next(val int) int {
+	return c.Nodes[val]
 }
