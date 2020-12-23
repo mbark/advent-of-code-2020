@@ -115,13 +115,34 @@ L.LLLLLL.L
 L.LLLLL.LL
 `
 
+type Seat struct {
+	y     int
+	x     int
+	state State
+}
+
+type State int
+
+const (
+	Free State = iota
+	Occupied
+)
+
 func main() {
+	stop := util.WithProfiling()
+	defer stop()
+
 	lines := util.ReadInput(input, "\n")
-	var fSeats [][]rune
-	var sSeats [][]rune
-	for _, l := range lines {
-		fSeats = append(fSeats, []rune(l))
-		sSeats = append(sSeats, []rune(l))
+	fSeats := make(map[int]*Seat)
+	sSeats := make(map[int]*Seat)
+	for y, row := range lines {
+		for x, l := range row {
+			if l == 'L' {
+				hash := Seat{y: y, x: x}.Hash()
+				fSeats[hash] = &Seat{y: y, x: x, state: Free}
+				sSeats[hash] = &Seat{y: y, x: x, state: Free}
+			}
+		}
 	}
 
 	fmt.Printf("first %d\n", first(fSeats))
@@ -134,45 +155,41 @@ type Update struct {
 	To     rune
 }
 
-func first(seats [][]rune) int {
-	return emptySeats(seats, 4, adjacentLocal)
+func first(seats map[int]*Seat) int {
+	return emptySeats(seats, 4, adjacentLocal(seats))
 }
 
-func second(seats [][]rune) int {
-	return emptySeats(seats, 5, adjacentView)
+func second(seats map[int]*Seat) int {
+	return emptySeats(seats, 5, adjacentView(seats))
 }
 
-func emptySeats(seats [][]rune, leaveIf int, adjacent func(seats [][]rune, ri, ci int) []rune) int {
-	var updates []Update
+func emptySeats(seats map[int]*Seat, leaveIf int, adjacent map[int][]*Seat) int {
 	for {
-		for ri, row := range seats {
-			for ci, s := range row {
-				adj := adjacent(seats, ri, ci)
-				switch s {
-				case '.':
-					continue
-				case 'L':
-					hasOccupied := false
-					for _, a := range adj {
-						if a == '#' {
-							hasOccupied = true
-							break
-						}
-					}
+		updates := make(map[int]State, len(seats))
 
-					if !hasOccupied {
-						updates = append(updates, Update{RowIdx: ri, ColIdx: ci, To: '#'})
+		for hash, s := range seats {
+			adj := adjacent[hash]
+			switch s.state {
+			case Free:
+				hasOccupied := false
+				for _, a := range adj {
+					if a.state == Occupied {
+						hasOccupied = true
+						break
 					}
-				case '#':
-					occoupied := 0
-					for _, a := range adj {
-						if a == '#' {
-							occoupied += 1
-						}
-					}
+				}
 
+				if !hasOccupied {
+					updates[hash] = Occupied
+				}
+			case Occupied:
+				occoupied := 0
+				for _, a := range adj {
+					if a.state == Occupied {
+						occoupied += 1
+					}
 					if occoupied >= leaveIf {
-						updates = append(updates, Update{RowIdx: ri, ColIdx: ci, To: 'L'})
+						updates[hash] = Free
 					}
 				}
 			}
@@ -181,19 +198,18 @@ func emptySeats(seats [][]rune, leaveIf int, adjacent func(seats [][]rune, ri, c
 		if len(updates) == 0 {
 			break
 		}
-		for _, u := range updates {
-			seats[u.RowIdx][u.ColIdx] = u.To
-		}
 
-		updates = []Update{}
+		for hash, to := range updates {
+			s := seats[hash]
+			s.state = to
+			seats[hash] = s
+		}
 	}
 
 	occupied := 0
 	for _, s := range seats {
-		for _, c := range s {
-			if c == '#' {
-				occupied += 1
-			}
+		if s.state == Occupied {
+			occupied += 1
 		}
 	}
 
@@ -212,62 +228,80 @@ func printSeats(seats [][]rune) {
 	fmt.Println()
 }
 
-func adjacentLocal(seats [][]rune, ri, ci int) []rune {
-	var adjPos []rune
-	for i := ri - 1; i <= ri+1; i++ {
-		for j := ci - 1; j <= ci+1; j++ {
-			if i == ri && j == ci {
-				continue
-			}
+func adjacentLocal(seats map[int]*Seat) map[int][]*Seat {
+	adj := func(ri, ci int) []*Seat {
+		var adjSeat []*Seat
+		for i := ri - 1; i <= ri+1; i++ {
+			for j := ci - 1; j <= ci+1; j++ {
+				if i == ri && j == ci {
+					continue
+				}
 
-			if i < 0 || i >= len(seats) {
-				continue
+				seat, ok := seats[Seat{y: i, x: j}.Hash()]
+				if ok {
+					adjSeat = append(adjSeat, seat)
+				}
 			}
-
-			row := seats[i]
-			if j < 0 || j >= len(row) {
-				continue
-			}
-
-			adjPos = append(adjPos, row[j])
 		}
+
+		return adjSeat
 	}
 
-	return adjPos
+	adjacent := make(map[int][]*Seat, len(seats))
+	for hash, seat := range seats {
+		adjacent[hash] = adj(seat.y, seat.x)
+	}
+
+	return adjacent
 }
 
-func adjacentView(seats [][]rune, ri, ci int) []rune {
-	var adjSeats []rune
-	for i := -1; i <= 1; i++ {
-		for j := -1; j <= 1; j++ {
-			if i == 0 && j == 0 {
-				continue
-			}
-
-			m := 0
-			for {
-				m += 1
-
-				rowi := ri - i*m
-				coli := ci - j*m
-
-				if rowi < 0 || rowi >= len(seats) {
-					break
-				}
-
-				row := seats[rowi]
-				if coli < 0 || coli >= len(row) {
-					break
-				}
-
-				c := seats[rowi][coli]
-				if c == 'L' || c == '#' {
-					adjSeats = append(adjSeats, row[coli])
-					break
-				}
-			}
+func adjacentView(seats map[int]*Seat) map[int][]*Seat {
+	max := 0
+	for _, s := range seats {
+		if s.y > max {
+			max = s.y
 		}
 	}
 
-	return adjSeats
+	adj := func(ri, ci int) []*Seat {
+		var adjSeats []*Seat
+		for i := -1; i <= 1; i++ {
+			for j := -1; j <= 1; j++ {
+				if i == 0 && j == 0 {
+					continue
+				}
+
+				m := 0
+				for {
+					m += 1
+
+					y := ri - i*m
+					x := ci - j*m
+
+					if y < 0 || y > max || x < 0 || x > max {
+						break
+					}
+
+					seat, ok := seats[Seat{y: y, x: x}.Hash()]
+					if ok {
+						adjSeats = append(adjSeats, seat)
+						break
+					}
+				}
+			}
+		}
+
+		return adjSeats
+	}
+
+	adjacent := make(map[int][]*Seat, len(seats))
+	for hash, seat := range seats {
+		adjacent[hash] = adj(seat.y, seat.x)
+	}
+
+	return adjacent
+}
+
+func (seat Seat) Hash() int {
+	return seat.y + 1000*seat.x
 }
