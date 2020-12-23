@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/mbark/advent-of-code-2020/util"
 )
 
 const input = `
@@ -16,7 +18,7 @@ const testInput = `
 
 type CircularList struct {
 	Start *Node
-	Nodes map[int]*Node
+	Nodes []*Node
 	Max   int
 	Min   int
 }
@@ -27,6 +29,9 @@ type Node struct {
 }
 
 func main() {
+	stop := util.WithProfiling()
+	defer stop()
+
 	var ns []int
 	for _, i := range strings.TrimSpace(input) {
 		n, _ := strconv.Atoi(string(i))
@@ -89,13 +94,12 @@ func play(list CircularList, iterations int) CircularList {
 				dest = list.Max
 			}
 
-			destCup = list.Nodes[dest]
-
-			if destCup != next1 && destCup != next2 && destCup != next3 {
+			if dest != next1.Val && dest != next2.Val && dest != next3.Val {
 				break
 			}
 		}
 
+		destCup = list.Nodes[dest]
 		destCup.Next, next3.Next = next1, destCup.Next
 		curr = curr.Next
 	}
@@ -107,7 +111,7 @@ func Build(list []int) CircularList {
 	var start *Node
 	var current *Node
 	var max, min int
-	nodes := make(map[int]*Node)
+	nodes := make([]*Node, len(list)+1)
 
 	for _, n := range list {
 		node := &Node{Val: n}
@@ -120,7 +124,6 @@ func Build(list []int) CircularList {
 		}
 
 		current = node
-
 		if min == 0 || n < min {
 			min = n
 		}
