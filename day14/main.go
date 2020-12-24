@@ -610,6 +610,9 @@ type Instruction struct {
 }
 
 func main() {
+	stop := util.WithProfiling()
+	defer stop()
+
 	lines := util.ReadInput(input, "\n")
 	var instructions []Instruction
 	rg := regexp.MustCompile("mem\\[(?P<Address>[0-9]+)\\] = (?P<Val>[0-9]+)")
