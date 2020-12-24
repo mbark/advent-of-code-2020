@@ -643,7 +643,7 @@ func main() {
 }
 
 func first(instructions []Instruction) int {
-	memory := make(map[int][]rune)
+	memory := make(map[int][]rune, len(instructions))
 	var mask string
 
 	for _, ins := range instructions {
@@ -674,7 +674,7 @@ func first(instructions []Instruction) int {
 }
 
 func second(instructions []Instruction) int {
-	memory := make(map[int][]rune)
+	memory := make(map[int][]rune, len(instructions))
 	var mask string
 
 	for _, ins := range instructions {
@@ -683,16 +683,19 @@ func second(instructions []Instruction) int {
 			continue
 		}
 
+		var b strings.Builder
+
 		val := asList(ins.Value)
 		addr := asList(ins.Address)
 		for i, m := range mask {
 			if m == '0' {
-				continue
+				b.WriteRune(addr[i])
+			} else {
+				b.WriteRune(m)
 			}
-			addr[i] = m
 		}
 
-		addrs := addresses(addr)
+		addrs := addresses(b.String())
 		for _, a := range addrs {
 			i, _ := strconv.ParseInt(string(a), 2, 64)
 			memory[int(i)] = val
@@ -709,26 +712,17 @@ func second(instructions []Instruction) int {
 }
 
 func asList(i int) []rune {
-	b := fmt.Sprintf("%b", i)
-
-	start := 36 - len(b)
-	var val []rune
-	for i := 0; i < start; i++ {
-		val = append(val, '0')
-	}
-	for _, d := range b {
-		val = append(val, d)
-	}
-
-	return val
+	b := strconv.FormatInt(int64(i), 2)
+	return []rune(strings.Repeat("0", 36-len(b)) + b)
 }
 
-func addresses(a []rune) []string {
-	s := string(a)
-
+func addresses(s string) []string {
 	if !strings.Contains(s, "X") {
 		return []string{s}
 	}
 
-	return append(addresses([]rune(strings.Replace(s, "X", "0", 1))), addresses([]rune(strings.Replace(s, "X", "1", 1)))...)
+	return append(
+		addresses(strings.Replace(s, "X", "0", 1)),
+		addresses(strings.Replace(s, "X", "1", 1))...,
+	)
 }

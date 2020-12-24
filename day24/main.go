@@ -554,6 +554,9 @@ type Tile struct {
 }
 
 func main() {
+	stop := util.WithProfiling()
+	defer stop()
+
 	instructions := util.ReadInput(input, "\n")
 	tiles := first(instructions)
 	fmt.Printf("first %d\n", len(tiles))
@@ -588,12 +591,11 @@ func first(instructions []string) map[int]Tile {
 func second(tiles map[int]Tile, times int) map[int]Tile {
 	for i := 0; i < times; i++ {
 		newt := make(map[int]Tile, len(tiles))
-		adjacentBlack := make(map[Tile]int)
+		adjacentBlack := make(map[Tile]int, len(tiles)*4)
 
 		for hash, tile := range tiles {
 			adjblack := 0
-			for _, dir := range []string{"se", "sw", "ne", "nw", "e", "w"} {
-				tm, _ := tile.Move(dir)
+			for _, tm := range tile.Neighbors() {
 				if _, ok := tiles[tm.Hash()]; ok {
 					adjblack += 1
 					continue
@@ -622,6 +624,19 @@ func second(tiles map[int]Tile, times int) map[int]Tile {
 
 func (t Tile) Hash() int {
 	return t.z + 1000*t.y + 1000*1000*t.x
+}
+
+func (t Tile) Neighbors() []Tile {
+	neighbors := make([]Tile, 6)
+	for i, m := range []struct {
+		x int
+		y int
+		z int
+	}{{z: 1, y: -1}, {x: -1, z: 1}, {x: 1, z: -1}, {z: -1, y: 1}, {x: 1, y: -1}, {x: -1, y: 1}} {
+		neighbors[i] = Tile{x: t.x + m.x, y: t.y + m.y, z: t.z + m.z}
+	}
+
+	return neighbors
 }
 
 func (t Tile) Move(ins string) (Tile, int) {
